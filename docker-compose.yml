@@ -1,0 +1,54 @@
+name: strataforge
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: strataforge-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-strataforge}
+      POSTGRES_USER: ${POSTGRES_USER:-strataforge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+    ports:
+      - "5434:5432"
+
+    volumes:
+      - strataforge_pgdata:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-strataforge} -d ${POSTGRES_DB:-strataforge}"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build: ./backend
+    container_name: strataforge-backend
+
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-strataforge}
+      DATABASE_USERNAME: ${POSTGRES_USER:-strataforge}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
+      CLERK_ISSUER_URL: ${CLERK_ISSUER_URL}
+      CLERK_JWKS_URL: ${CLERK_JWKS_URL}
+
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+
+    ports:
+      - "8081:8080"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  strataforge_pgdata:

@@ -1,0 +1,11 @@
+#root {
+  min-height: 100vh;
+}
+/* Clerk modal launch buttons should inherit the existing link/button styling. */
+.landing-actions > button.button,
+.hero-actions > button.button,
+.cta > button.button {
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}

@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: strataforge-backend
+    runtime: docker
+    rootDir: backend
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_USERNAME
+        sync: false
+      - key: DATABASE_PASSWORD
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: CLERK_ISSUER_URL
+        sync: false
+      - key: CLERK_JWKS_URL
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
