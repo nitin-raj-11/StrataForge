@@ -102,7 +102,7 @@ function ParameterSweep() {
 
           <button
             className="primary-button"
-            onClick={handleRunBacktest}
+            onClick={handleRunSweep}
             disabled={isRunning}
           >
             {isRunning ? "Running Sweep..." : "Run Sweep"}

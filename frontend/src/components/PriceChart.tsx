@@ -22,7 +22,7 @@ export default function PriceChart({ bars, trades, multiplier = 1, currency = "U
     const bgColor = theme === 'light' ? '#ffffff' : '#121820';
     const textColor = theme === 'light' ? '#14181f' : '#F6F3EC';
     const gridColor = theme === 'light' ? '#e1dacb' : '#252d37';
-    const chart: IChartApi = createChart(containerRef.current, { width: containerRef.current.clientWidth, height: 420, layout: { background: { color: bgColor }, textColor }, grid: { vertLines: { color: gridColor }, horzLines: { color: gridColor } }, crosshair: { mode: CrosshairMode.Normal }, localization: { priceFormatter: (value) => `${currency === "INR" ? "₹" : "$"}${value.toFixed(2)}` } });
+    const chart: IChartApi = createChart(containerRef.current, { width: containerRef.current.clientWidth, height: 420, layout: { background: { color: bgColor }, textColor }, grid: { vertLines: { color: gridColor }, horzLines: { color: gridColor } }, crosshair: { mode: CrosshairMode.Normal }, localization: { priceFormatter: (value: number) => `${currency === "INR" ? "₹" : "$"}${value.toFixed(2)}` } });
     const series = chart.addSeries(CandlestickSeries, { upColor: "#3FA37B", downColor: "#D1554E", borderVisible: false, wickUpColor: "#3FA37B", wickDownColor: "#D1554E" });
     const data: CandlestickData[] = bars.map(b => ({ time: b.time as Time, open: b.open * multiplier, high: b.high * multiplier, low: b.low * multiplier, close: b.close * multiplier }));
     series.setData(data);

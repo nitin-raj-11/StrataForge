@@ -31,8 +31,9 @@ export default function Profile() {
   if (!isLoaded) return <div className="page-loading">Loading profile…</div>;
   if (!isSignedIn || !user) return null;
 
-  const email = user.primaryEmailAddress?.emailAddress || "";
-  const hasPassword = Boolean(user.passwordEnabled);
+  const currentUser = user;
+  const email = currentUser.primaryEmailAddress?.emailAddress || "";
+  const hasPassword = Boolean(currentUser.passwordEnabled);
 
   async function saveProfile(e: FormEvent) {
     e.preventDefault();
@@ -40,7 +41,7 @@ export default function Profile() {
     setProfileSuccess("");
     setSavingProfile(true);
     try {
-      await user.update({ firstName: firstName.trim(), lastName: lastName.trim() });
+      await currentUser.update({ firstName: firstName.trim(), lastName: lastName.trim() });
       setProfileSuccess("Profile details updated.");
     } catch (error) {
       setProfileError(clerkError(error, "We couldn't update your profile."));
@@ -57,7 +58,7 @@ export default function Profile() {
     setProfileSuccess("");
     setUploadingPhoto(true);
     try {
-      await user.setProfileImage({ file });
+      await currentUser.setProfileImage({ file });
       setProfileSuccess("Profile picture updated.");
     } catch (error) {
       setProfileError(clerkError(error, "We couldn't update your profile picture."));
@@ -88,7 +89,7 @@ export default function Profile() {
     }
     setSavingPassword(true);
     try {
-      await user.updatePassword({ currentPassword: oldPassword, newPassword, signOutOfOtherSessions: true });
+      await currentUser.updatePassword({ currentPassword: oldPassword, newPassword, signOutOfOtherSessions: true });
       setOldPassword("");
       setNewPassword("");
       setConfirmPassword("");
@@ -114,9 +115,9 @@ export default function Profile() {
       <div className="profile-grid">
         <section className="surface profile-card">
           <div className="profile-identity">
-            <img src={user.imageUrl} alt="Profile" className="profile-avatar" />
+            <img src={currentUser.imageUrl} alt="Profile" className="profile-avatar" />
             <div>
-              <h2>{user.fullName || "Your name"}</h2>
+              <h2>{currentUser.fullName || "Your name"}</h2>
               <p>{email}</p>
             </div>
           </div>
