@@ -1,9 +1,9 @@
 name: Update Market Data
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: "30 0 * * *"
-  workflow_dispatch:
 
 jobs:
   ingest:
