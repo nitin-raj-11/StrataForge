@@ -1,4 +1,4 @@
-"""Load daily OHLCV history from Yahoo Finance via yfinance into PostgreSQL."""
+"""Load daily OHLCV history from Yahoo Finance into PostgreSQL."""
 
 import os
 import time
@@ -32,6 +32,8 @@ DEFAULT_TICKERS = [
     "USDINR=X",
 ]
 
+DEFAULT_START_DATE = "2010-01-01"
+
 TICKERS = [
     ticker.strip()
     for ticker in os.getenv(
@@ -41,13 +43,8 @@ TICKERS = [
     if ticker.strip()
 ]
 
-START_DATE = os.getenv(
-    "INGEST_START",
-    "2010-01-01",
-)
-
-# yfinance treats the `end` date as exclusive.
-# Using tomorrow ensures today's available market data can be included.
+# Yahoo Finance's `end` parameter is exclusive, so using tomorrow's date
+# ensures today's completed market data can be included when available.
 END_DATE = os.getenv(
     "INGEST_END",
     (date.today() + timedelta(days=1)).isoformat(),
@@ -64,11 +61,49 @@ def db_connection():
     return psycopg2.connect(DATABASE_URL)
 
 
-def download(ticker: str):
-    """Download daily OHLCV data for a ticker from Yahoo Finance."""
+def get_latest_date(cur, ticker):
+    """
+    Return the latest date already stored for a ticker.
+
+    Returns:
+        datetime.date | None
+    """
+    cur.execute(
+        """
+        SELECT MAX(date)
+        FROM ohlcv_bars
+        WHERE ticker = %s
+        """,
+        (ticker.upper(),),
+    )
+
+    return cur.fetchone()[0]
+
+
+def get_start_date(cur, ticker):
+    """
+    Determine the first date that needs to be downloaded.
+
+    If the ticker already exists in the database:
+        latest database date + 1 day
+
+    If the ticker has no data:
+        DEFAULT_START_DATE
+    """
+    latest_date = get_latest_date(cur, ticker)
+
+    if latest_date is None:
+        return DEFAULT_START_DATE
+
+    next_date = latest_date + timedelta(days=1)
+    return next_date.isoformat()
+
+
+def download(ticker, start_date):
+    """Download daily OHLCV data from Yahoo Finance."""
     return yf.download(
         ticker,
-        start=START_DATE,
+        start=start_date,
         end=END_DATE,
         interval="1d",
         auto_adjust=False,
@@ -79,53 +114,49 @@ def download(ticker: str):
 
 
 def main():
-    """Download and upsert OHLCV data for all configured tickers."""
-    print(f"Date range: {START_DATE} -> {END_DATE}")
-    print(f"Tickers: {', '.join(TICKERS)}")
-
+    """Run market-data ingestion for all configured tickers."""
     conn = db_connection()
+    failed_tickers = []
 
     try:
         cur = conn.cursor()
 
         for ticker in TICKERS:
-            print(f"Downloading {ticker}...")
+            ticker = ticker.upper()
+            start_date = get_start_date(cur, ticker)
+
+            print(
+                f"Downloading {ticker}: "
+                f"{start_date} -> {END_DATE}"
+            )
+
+            # Nothing new to download.
+            if start_date >= END_DATE:
+                print(f" {ticker}: already up to date")
+                time.sleep(1)
+                continue
 
             try:
-                df = download(ticker)
+                df = download(ticker, start_date)
 
                 if df.empty:
-                    print(f"  No data returned for {ticker}")
+                    print(f" {ticker}: no new market data")
+                    time.sleep(1)
                     continue
 
                 # yfinance can return MultiIndex columns.
                 if getattr(df.columns, "nlevels", 1) > 1:
                     df.columns = df.columns.get_level_values(0)
 
-                required_columns = ["Open", "High", "Low", "Close"]
-
-                missing_columns = [
-                    column
-                    for column in required_columns
-                    if column not in df.columns
-                ]
-
-                if missing_columns:
-                    print(
-                        f"  Missing columns for {ticker}: "
-                        f"{', '.join(missing_columns)}"
-                    )
-                    continue
-
                 count = 0
 
-                valid_rows = df.dropna(
-                    subset=["Open", "High", "Low", "Close"]
-                )
+                for index, row in df.dropna(
+                        subset=["Open", "High", "Low", "Close"]
+                ).iterrows():
 
-                for index, row in valid_rows.iterrows():
                     volume = row.get("Volume")
 
+                    # Convert NaN volume to NULL.
                     if volume is None or volume != volume:
                         volume = None
                     else:
@@ -133,16 +164,10 @@ def main():
 
                     cur.execute(
                         """
-                        INSERT INTO ohlcv_bars (
-                            ticker,
-                            date,
-                            open,
-                            high,
-                            low,
-                            close,
-                            volume
-                        )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)
+                        INSERT INTO ohlcv_bars
+                            (ticker, date, open, high, low, close, volume)
+                        VALUES
+                            (%s, %s, %s, %s, %s, %s, %s)
                             ON CONFLICT (ticker, date) DO UPDATE SET
                                                               open = EXCLUDED.open,
                                                               high = EXCLUDED.high,
@@ -151,7 +176,7 @@ def main():
                                                               volume = EXCLUDED.volume
                         """,
                         (
-                            ticker.upper(),
+                            ticker,
                             index.date(),
                             float(row["Open"]),
                             float(row["High"]),
@@ -164,20 +189,34 @@ def main():
                     count += 1
 
                 conn.commit()
-
-                print(f"  Loaded {ticker}: {count} rows")
+                print(f" Loaded {ticker}: {count} rows")
 
             except Exception as exc:
                 conn.rollback()
-                print(f"  Failed {ticker}: {exc}")
+                failed_tickers.append(ticker)
+                print(f" Failed {ticker}: {exc}")
 
-            # Small delay between Yahoo Finance requests.
             time.sleep(1)
 
         cur.close()
 
     finally:
         conn.close()
+
+    # Make GitHub Actions fail visibly if any ticker failed,
+    # while still allowing all other tickers to finish.
+    if failed_tickers:
+        failed = ", ".join(failed_tickers)
+
+        print(
+            "Ingestion completed with failures: "
+            + failed
+        )
+
+        raise RuntimeError(
+            "Market-data ingestion failed for: "
+            + failed
+        )
 
     print("Done.")
 
