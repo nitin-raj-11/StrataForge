@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import AuthModalButton from "../components/AuthModalButton";
 import CurrencyToggle from "../components/CurrencyToggle";
@@ -132,6 +133,7 @@ function FeatureVisual({ type }: { type: "build" | "backtest" | "optimize" | "an
 
 export default function Landing() {
   const { formatMoney } = useCurrency();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   return (
     <div className="landing">
       <header className="landing-header">
@@ -141,10 +143,41 @@ export default function Landing() {
             <span>StrataForge</span>
           </Link>
           <div className="landing-actions">
-            <CurrencyToggle compact />
-            <ThemeToggle compact />
-            <AuthModalButton mode="signIn" className="button button-secondary">Sign in</AuthModalButton>
-            <AuthModalButton mode="signUp" className="button button-primary">Get started</AuthModalButton>
+            <div className="landing-top-actions">
+              <ThemeToggle compact />
+
+              <button
+                  type="button"
+                  className={`mobile-menu-toggle ${mobileMenuOpen ? "open" : ""}`}
+                  aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+                  aria-expanded={mobileMenuOpen}
+                  onClick={() => setMobileMenuOpen((open) => !open)}
+              >
+                <span />
+                <span />
+                <span />
+              </button>
+            </div>
+
+            <div className="landing-currency">
+              <CurrencyToggle compact />
+            </div>
+
+            <div className={`landing-auth-actions ${mobileMenuOpen ? "open" : ""}`}>
+              <AuthModalButton
+                  mode="signIn"
+                  className="button button-secondary"
+              >
+                Sign in
+              </AuthModalButton>
+
+              <AuthModalButton
+                  mode="signUp"
+                  className="button button-primary"
+              >
+                Get started
+              </AuthModalButton>
+            </div>
           </div>
         </div>
       </header>
